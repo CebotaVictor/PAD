@@ -63,7 +63,7 @@ namespace PR_c_.Infrastructure
 
                     foreach (var sub in subs)
                     {
-                        message.SubscriptionName = sub.Name!;
+                        message.SubscriptionName = sub.SubscriberName!;
                         await context.Messages.AddAsync(message);
                     }
                     await context.SaveChangesAsync();
@@ -139,7 +139,7 @@ namespace PR_c_.Infrastructure
         {
             using (var context = new MBDbContext())
             {
-                return context.Subscriptions.AsQueryable().Where(s => s.Name == TopicName).ToList() ?? new List<Subscription>();
+                return context.Subscriptions.AsQueryable().Where(s => s.SubscriberName == TopicName).ToList() ?? new List<Subscription>();
             } 
         }
 
@@ -149,7 +149,7 @@ namespace PR_c_.Infrastructure
             {
                 using (var context = new MBDbContext())
                 {
-                    if (!await context.Subscriptions.AnyAsync(s => s.Name == SubscriberName))
+                    if (!await context.Subscriptions.AnyAsync(s => s.SubscriberName == SubscriberName))
                     {
                         throw new Exception("SubscriberId of the subscription was not found");
                     }
