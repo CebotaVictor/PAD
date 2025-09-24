@@ -10,7 +10,7 @@ namespace PR_c_.Models
     public class Subscription
     {
         [Key]
-        public string? Name { get; set; }
+        public string? SubscriberName { get; set; }
 
         [Required]
         public string? TopicName { get; set; }
