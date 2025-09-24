@@ -1,0 +1,32 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "MessageBroker.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "..\\Subscriber\\Subscriber.csproj",
+        "Action": "StartWithoutDebugging"
+      }
+    ]
+  },
+  {
+    "Name": "Start MB&Pub",
+    "Projects": [
+      {
+        "Path": "MessageBroker.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\Subscriber\\Subscriber.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\Producer\\Publisher.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

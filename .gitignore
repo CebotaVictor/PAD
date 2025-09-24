@@ -1,0 +1,14 @@
+Lab1/MessageBroker/.vs/
+Lab1/MessageBroker/bin/
+Lab1/MessageBroker/obj/
+Lab1/MessageBroker/Directory.Build.props
+Lab1/MessageBroker/MessageBroker.slnLaunsh.user
+Lab1/MessageBroker/Migrations/
+
+
+
+Lab1/Producer/bin/
+Lab1/Producer/obj/
+
+Lab1/Subscriber/bin/
+Lab1/Subscriber/obj/
