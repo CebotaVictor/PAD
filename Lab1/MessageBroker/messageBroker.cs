@@ -1,18 +1,12 @@
-﻿using System.ComponentModel.Design;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
 using PR_c_.Models;
-using PR_c_.Infrastructure;
 using PR_c_.Enums;
 using System.Text.Json;
-using System.Security.Cryptography;
-using System.Security.AccessControl;
 using PR_c_.Helpers;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
 
 
 namespace PR_c_
@@ -21,8 +15,12 @@ namespace PR_c_
     {        
         public static bool isRunning = true;
         public static int client_connected = 0;
-        public static Dictionary<string, List<Client>> dicSubscribers = new();
-        private static Dictionary<string, List<PacketFrame>>? _packetFrames = new();
+        // Store messages per topic
+        public static ConcurrentDictionary<string, List<PacketFrame>> _packetFrames = new();
+        // Store subscribers per topic
+        public static ConcurrentDictionary<string, Dictionary<string, Client>> dicSubscribers = new();
+        // Store offsets per subscriber per topic
+        public static ConcurrentDictionary<string, Dictionary<string, int?>> _subscriberOffsets= new();
         public static List <Client> clients = new();
         public static List <Topic>? topics;
         public static void Main(string[] args)
@@ -95,16 +93,16 @@ namespace PR_c_
 
             else { Console.WriteLine("Warning: Client RemoteEndPoint is null. Closing connection");  socket?.Close(); }
 
-            Console.WriteLine("Connected with {0}, and {1}", clientEndpoint.Address, clientEndpoint.Port);
-
+            //Console.WriteLine("Connected with {0}, and {1}", clientEndpoint.Address, clientEndpoint.Port);
             
             try
             {
+
                 int bytesRead;
                 (string roleMessage, bytesRead) = await Helper.ReceiveData(client.socket!);
                 if (bytesRead == 0) { Console.WriteLine("Client disconnected"); return; }
                 ClientRole role = ParseRole(roleMessage);
-                Console.WriteLine($"Client {((IPEndPoint)socket!.LocalEndPoint!).AddressFamily}:{((IPEndPoint)socket.LocalEndPoint!).Port} identified as {role}");
+                Console.WriteLine($"Client {clientEndpoint.Address}:{clientEndpoint.Port} identified as {role}");
                 
                 client.clientRole = role;  
 
@@ -114,26 +112,117 @@ namespace PR_c_
                     while (true)
                     {
                         (string subscription, bytesRead) = await Helper.ReceiveData(client.socket!);
+                        await Helper.SendBasicData(client.socket!,"hello");
+                        
                         var jsonToSubscription = JsonSerializer.Deserialize<Subscription>(subscription);
                         if (jsonToSubscription is not Subscription || string.IsNullOrEmpty(jsonToSubscription.SubscriberName)) { Console.WriteLine("Send a valid subscription frame"); client.socket!.Close(); return; }
                         Console.WriteLine($"Received subscription: {jsonToSubscription.SubscriberName} | {jsonToSubscription.TopicName} ");
 
-                        client.TopicName = jsonToSubscription.TopicName;
-
                         if (jsonToSubscription != null)
                         {
-                            lock (dicSubscribers)
+                            if (!dicSubscribers.ContainsKey(jsonToSubscription.TopicName!))
                             {
-                                if (!dicSubscribers.ContainsKey(jsonToSubscription.TopicName!))
-                                    dicSubscribers[jsonToSubscription.TopicName!] = new List<Client>();
-
-                                var subClient = clients.First(c => c.socket == client.socket);
-                                subClient.TopicName = jsonToSubscription.TopicName;
-                                dicSubscribers[jsonToSubscription.TopicName!].Add(subClient);
+                                dicSubscribers[jsonToSubscription.TopicName!] = new Dictionary<string, Client>();
+                                if (_packetFrames![jsonToSubscription.TopicName!].Count == 0)
+                                    _packetFrames![jsonToSubscription.TopicName!] = new List<PacketFrame>();
+                                _subscriberOffsets[jsonToSubscription.TopicName!] = new();
                             }
-                            Console.WriteLine($"Subscriber added to topic {jsonToSubscription.TopicName!}");
+
+                            // replace old client if same subscriber reconnects
+                            dicSubscribers[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName] = client;
+
+                            // if subscriber offset doesn't exist, set it to -1 (means "no messages received yet")
+                            if (!_subscriberOffsets[jsonToSubscription.TopicName!].ContainsKey(jsonToSubscription.SubscriberName))
+                            {
+                                _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName] = null;
+                            }
+
+                            // now send only missed messages
+                            var offset = _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName];
+                            var messages = _packetFrames[jsonToSubscription.TopicName!];
+
+                            if (messages.Count == 0)
+                            {
+                                Console.WriteLine($"No messages to send to {jsonToSubscription.SubscriberName} for topic {jsonToSubscription.TopicName}");
+                                break;
+                            }
+                            if (offset != null)
+                            {
+                                for (int i = (int)offset!; i < messages.Count; i++)
+                                {
+                                    var jsonData = JsonSerializer.Serialize(messages[i]);
+                                    byte[] msgToSend = Encoding.UTF8.GetBytes(jsonData);
+
+                                    try
+                                    {
+                                        await client.socket!.SendAsync(msgToSend, SocketFlags.None);
+                                        Console.WriteLine($"Sent backlog message to {jsonToSubscription.SubscriberName}");
+                                        _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName] = i;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"Failed to send backlog message: {ex.Message}");
+                                        client.isConnected = false;
+                                        break;
+                                    }
+                                }
+                                _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName]++;
+                            }
+                            else if (offset == null)
+                            {
+                                offset = 0;
+                                for (int i = (int)offset; i < messages.Count; i++)
+                                {
+                                    var jsonData = JsonSerializer.Serialize(messages[i]);
+                                    byte[] msgToSend = Encoding.UTF8.GetBytes(jsonData);
+
+                                    try
+                                    {
+                                        await client.socket!.SendAsync(msgToSend, SocketFlags.None);
+                                        Console.WriteLine($"Sent backlog message to {jsonToSubscription.SubscriberName}");
+                                        _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName] = i;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"Failed to send backlog message: {ex.Message}");
+                                        client.isConnected = false;
+                                        break;
+                                    }
+                                }
+                                _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName]++;
+                            }
+
+                            ////check if the subscriber already exists by its name and topic name
+                            //if (dicSubscribers[jsonToSubscription!.TopicName!].ContainsKey(jsonToSubscription.SubscriberName))
+                            //{
+                            //    var a = _packetFrames![jsonToSubscription.TopicName!];
+                            //    Console.WriteLine($"Subscriber {jsonToSubscription.SubscriberName} already exists for topic {jsonToSubscription.TopicName!}. Sending existing messages.");
+
+                            //    foreach (var msg in a)
+                            //    {
+                            //        var jsonData = JsonSerializer.Serialize(msg);
+                            //        byte[] msgToSend = Encoding.UTF8.GetBytes(jsonData);
+                            //        try
+                            //        {
+                            //            await client.socket!.SendAsync(msgToSend, SocketFlags.None);
+                            //            Console.WriteLine($"Message sent to existing subscriber on topic {jsonToSubscription.TopicName!}");
+                            //        }
+                            //        catch (Exception ex)
+                            //        {
+                            //            Console.WriteLine($"Failed to send to existing subscriber, removing... {ex.Message}");
+                            //            client.isConnected = false;
+                            //        }
+                            //    }
+                            //}
+                            //client.TopicName = jsonToSubscription.TopicName;
+                            //break;
                         }
-                        break;
+                        else
+                        {
+                            throw new NullReferenceException("Subscription frame is null");
+                        }
+                        
+                        // Check if subscriber already exists for the topic
                     }
                 }
 
@@ -153,13 +242,11 @@ namespace PR_c_
                         if (jsonToMessage == null) Console.WriteLine("Message is corrupted try again");
                         client.TopicName = jsonToMessage!.TopicName;
                         Console.WriteLine($"Client {clientEndpoint.Address}, {clientEndpoint.Port} with Topic Message : {data}");
-
+                        if (!_packetFrames!.ContainsKey(jsonToMessage.TopicName!))
+                            _packetFrames[jsonToMessage.TopicName!] = new List<PacketFrame>();
+                        _packetFrames[jsonToMessage.TopicName!].Add(jsonToMessage);
                         if (dicSubscribers.TryGetValue(jsonToMessage!.TopicName!, out var subs))
                         {
-
-                            if (!_packetFrames!.ContainsKey(jsonToMessage.TopicName!))
-                                _packetFrames[jsonToMessage.TopicName!] = new List<PacketFrame>();
-                            _packetFrames[jsonToMessage.TopicName!].Add(jsonToMessage);
                             Console.WriteLine($"Total number of messages of topic {client.TopicName} is {_packetFrames[jsonToMessage.TopicName!].Count()}");
 
                             var jsonData = JsonSerializer.Serialize(jsonToMessage);
@@ -168,16 +255,18 @@ namespace PR_c_
                             {
                                 try
                                 {
-                                    await sub.socket!.SendAsync(msg, SocketFlags.None);
-                                    Console.WriteLine($"Message sent to subscriber on topic {sub.socket.RemoteEndPoint}");
+                                    await sub.Value.socket!.SendAsync(msg, SocketFlags.None);
+                                    Console.WriteLine($"Message sent to subscriber on topic {sub.Value.socket!.RemoteEndPoint}");
                                 }
                                 catch (Exception ex)
                                 {
                                     Console.WriteLine($"Failed to send to subscriber, removing... {ex.Message}");
-                                    sub.isConnected = false;
+                                    sub.Value.isConnected = false;
                                 }
                             }
                         }
+
+
                     }
                 }
 
