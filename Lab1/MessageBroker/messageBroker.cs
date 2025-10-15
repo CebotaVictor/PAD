@@ -22,7 +22,6 @@ namespace PR_c_
         // Store offsets per subscriber per topic
         public static ConcurrentDictionary<string, Dictionary<string, int?>> _subscriberOffsets= new();
         public static List <Client> clients = new();
-        public static List <Topic>? topics;
         public static void Main(string[] args)
         {
             InitializeServer();
@@ -112,7 +111,6 @@ namespace PR_c_
                     while (true)
                     {
                         (string subscription, bytesRead) = await Helper.ReceiveData(client.socket!);
-                        await Helper.SendBasicData(client.socket!,"hello");
                         
                         var jsonToSubscription = JsonSerializer.Deserialize<Subscription>(subscription);
                         if (jsonToSubscription is not Subscription || string.IsNullOrEmpty(jsonToSubscription.SubscriberName)) { Console.WriteLine("Send a valid subscription frame"); client.socket!.Close(); return; }
@@ -274,11 +272,11 @@ namespace PR_c_
             }
             catch (SocketException e)
             {
-                Console.WriteLine($"Client disconnected with error {e}");
+                Console.WriteLine($"Client disconnected with error {e.Message}");
             }
             catch (Exception e)
             {
-                Console.WriteLine($"An error occurred {e}");
+                Console.WriteLine($"An error occurred {e.Message}");
             }
 
             Console.WriteLine("Disconnected from {0}", clientEndpoint.Address);

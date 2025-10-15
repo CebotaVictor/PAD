@@ -20,7 +20,7 @@ namespace Client
 
             ClientRole role = ClientRole.Publisher;
 
-            int bytesSend = await Helper.SendData(client, new { role = role});
+            int bytesSend = await Helper.SendData(client, new {role = role});
 
             if (bytesSend == 0) { Console.WriteLine("Client disconnected"); client.Close(); }
         }
