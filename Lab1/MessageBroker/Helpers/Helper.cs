@@ -5,12 +5,21 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
+using PR_c_.Models;
 
 namespace PR_c_.Helpers
 {
     public class Helper
     {
         public static async Task<int> SendData<T>(Socket client, T dataToSerialize)
+        {
+            var jsonT = JsonSerializer.Serialize(dataToSerialize);
+            Console.WriteLine(jsonT);
+            byte[] dataToSend = Encoding.UTF8.GetBytes(jsonT);
+            return await client.SendAsync(dataToSend);
+        }
+
+        public static async Task<int> SendBasicData(Socket client, string dataToSerialize)
         {
             var jsonT = JsonSerializer.Serialize(dataToSerialize);
             Console.WriteLine(jsonT);

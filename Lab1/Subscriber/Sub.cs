@@ -1,78 +1,85 @@
-﻿using PR_c_.Enums;
-using PR_c_.Helpers;
-using PR_c_.Models;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Text.Json;
+﻿    using PR_c_.Enums;
+    using PR_c_.Helpers;
+    using PR_c_.Models;
+    using System.Net;
+    using System.Net.Sockets;
+    using System.Text;
+    using System.Text.Json;
 
-namespace Subscriber
-{
-    internal class Sub
+    namespace Subscriber
     {
-        public readonly static string serverIp = "127.0.0.1";
-        public readonly static int serverPort = 9000;
-        private static List<Topic>? topics;
-
-        public static async Task SendRole(Socket client)
+        internal class Sub
         {
-            await client.ConnectAsync(new IPEndPoint(IPAddress.Parse(serverIp), serverPort));
-            Console.WriteLine("Connected to server {0}, {1}", serverIp, serverPort);
+            public readonly static string serverIp = "127.0.0.1";
+            public readonly static int serverPort = 9000;
+            private static List<Topic>? topics;
 
-            ClientRole role = ClientRole.Subscriber;
-
-            int bytesSend = await Helper.SendData(client, new { role = role });
-
-            if (bytesSend == 0) { Console.WriteLine("Client disconnected"); client.Close(); }
-        }
-        static async Task Main(string[] args)
-        {
-            //send role of the client
-            Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            await SendRole(client);
-
-            Subscription subscription = new();
-            while (true)
+            public static async Task SendRole(Socket client)
             {
-                Console.WriteLine("To what topic do you subscribe : ");
+                await client.ConnectAsync(new IPEndPoint(IPAddress.Parse(serverIp), serverPort));
+                Console.WriteLine("Connected to server {0}, {1}", serverIp, serverPort);
 
-                string? value = Console.ReadLine() ?? "";
-                if (string.IsNullOrEmpty(value)) { Console.WriteLine("Input a valid name"); continue; }
+                ClientRole role = ClientRole.Subscriber;
 
-                subscription.SubscriberName = $"Sub{value}";
-                subscription.TopicName = value;
+                int bytesSend = await Helper.SendData(client, new { role = role });
 
-                int bytesSend = await Helper.SendData(client, subscription);
-                break;
+                if (bytesSend == 0) { Console.WriteLine("Client disconnected"); client.Close(); }
             }
-
-            try
+            static async Task Main(string[] args)
             {
-                byte[] buffer = new byte[1024];
+                //send role of the client
+                Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                await SendRole(client);
 
+                Subscription subscription = new();
                 while (true)
                 {
-                    (string response, int bytesReceived) = await Helper.ReceiveData(client);
-                    if (bytesReceived == 0) { Console.WriteLine("Connection closed by the server"); break; }
-                    Console.WriteLine(response);
-                    var jsonToMessage =JsonSerializer.Deserialize<Message>(response);
+                    Console.WriteLine("Subscriber Name : ");
 
-                    if (jsonToMessage == null) { Console.WriteLine("Message is corrupted try again"); continue; }
+                    string? name = Console.ReadLine() ?? "";
+                    if (string.IsNullOrEmpty(name)) { Console.WriteLine("Input a valid name"); continue; }
 
-                    Console.WriteLine($"New message on topic {jsonToMessage.TopicName} : {jsonToMessage.TopicMessage}");
+
+                    Console.WriteLine("To what topic do you subscribe : ");
+
+                    string? value = Console.ReadLine() ?? "";
+                    if (string.IsNullOrEmpty(value)) { Console.WriteLine("Input a valid topic name"); continue; }
+
+                    subscription.SubscriberName = name;
+                    subscription.TopicName = value;
+
+                    int bytesSend = await Helper.SendData(client, subscription);
+                    break;
                 }
-                client.Close();
-            }
-            catch (SocketException ex)
-            {
-                Console.WriteLine("Socket exception: " + ex.Message);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("An error occurred: " + ex.Message);
+
+                try
+                {
+                    byte[] buffer = new byte[1024];
+
+                    while (true)
+                    {
+                        (string response, int bytesReceived) = await Helper.ReceiveData(client);
+                        if (bytesReceived == 0) { Console.WriteLine("Connection closed by the server"); break; }
+                        Console.WriteLine(response);
+
+                        //var jsonToMessage = JsonSerializer.Deserialize<PacketFrame>(response);
+
+                        //if (jsonToMessage == null) { Console.WriteLine("Message is corrupted try again"); continue; }
+
+                        Console.WriteLine($"New message on topic {response}");
+                    }
+                    client.Close();
+                }
+                catch (SocketException ex)
+                {
+                    Console.WriteLine("Socket exception: " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("An error occurred: " + ex.Message);
+                }
+
             }
 
         }
-
     }
-}

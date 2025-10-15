@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+option csharp_namespace = "PR_c_.Grpc";
+
+package broker;
+
+// The role of a client
+enum ClientRole {
+  PUBLISHER = 0;
+  SUBSCRIBER = 1;
+}
+
+// A message published to a topic
+message PacketFrame {
+  string topic_name = 1;
+  string message_content = 2;
+}
+
+// Subscription info
+message Subscription {
+  string subscriber_name = 1;
+  string topic_name = 2;
+}
+
+// Empty placeholder
+message Empty {}
+
+service BrokerService {
+  // Publishers send messages to topics
+  rpc PublishMessage (PacketFrame) returns (Empty);
+
+  // Subscribers connect and receive messages for a topic stream
+  rpc Subscribe (Subscription) returns (stream PacketFrame);
+}

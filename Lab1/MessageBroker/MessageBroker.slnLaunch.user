@@ -20,11 +20,11 @@
         "Action": "Start"
       },
       {
-        "Path": "..\\Subscriber\\Subscriber.csproj",
-        "Action": "Start"
+        "Path": "..\\Producer\\Publisher.csproj",
+        "Action": "StartWithoutDebugging"
       },
       {
-        "Path": "..\\Producer\\Publisher.csproj",
+        "Path": "..\\Subscriber\\Subscriber.csproj",
         "Action": "Start"
       }
     ]
