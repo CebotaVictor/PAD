@@ -30,11 +30,6 @@ namespace Lab2.Services
                 if (string.IsNullOrWhiteSpace(request.TopicName))
                     throw new RpcException(new Status(StatusCode.InvalidArgument, "TopicName cannot be empty"));
 
-                if (!_topicSubscribers.ContainsKey(request.TopicName!))
-                {
-                    _subscriberOffsets[request.TopicName!] = new();
-                }
-
                 _logger.LogInformation($"Publishing message to topic {request.TopicName}: {request.MessageContent}");
 
                 var messageList = _topicMessages.GetOrAdd(request.TopicName, _ => new List<PacketFrameMessage>());
@@ -59,7 +54,6 @@ namespace Lab2.Services
                         }
                     }
                 }
-
                 return Task.FromResult(new ResponseMessage {Success = true});
             }
             catch(Exception ex) {
@@ -81,25 +75,10 @@ namespace Lab2.Services
                 subscribers = _topicSubscribers.GetOrAdd(request.TopicName, _ => new List<IServerStreamWriter<PacketFrameMessage>>());
                 subscribers.Add(responseStream);
                 subscribers = _topicSubscribers.GetOrAdd(request.TopicName, _ => new List<IServerStreamWriter<PacketFrameMessage>>());
-
-                
-                
-                if (!_topicSubscribers.ContainsKey(request.TopicName!))
-                {
-                    _subscriberOffsets[request.TopicName!] = new();
-                }
-
-
-
-                if (!_subscriberOffsets[request.TopicName!].ContainsKey(request.SubscriberName))
-                {
-                    _subscriberOffsets[request.TopicName!][request.SubscriberName] = null;
-                }
-
-
                 var topicOffsets = _subscriberOffsets.GetOrAdd(request.TopicName, _ => new Dictionary<string, int?>());
+
                 if (!topicOffsets.ContainsKey(request.SubscriberName))
-                    topicOffsets[request.SubscriberName] = null; // null = no messages received yet
+                    topicOffsets[request.SubscriberName] = null;
 
                 var offset = _subscriberOffsets[request.TopicName!][request.SubscriberName];
                 var messagesList = _topicMessages.GetOrAdd(request.TopicName, _ => new List<PacketFrameMessage>());
