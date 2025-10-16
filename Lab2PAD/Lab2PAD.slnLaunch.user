@@ -1,0 +1,19 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "Lab2\\Broker.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Publisher\\Publisher.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "Subscriber\\Subscriber.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

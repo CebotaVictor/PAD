@@ -189,31 +189,6 @@ namespace PR_c_
                                 }
                                 _subscriberOffsets[jsonToSubscription.TopicName!][jsonToSubscription.SubscriberName]++;
                             }
-
-                            ////check if the subscriber already exists by its name and topic name
-                            //if (dicSubscribers[jsonToSubscription!.TopicName!].ContainsKey(jsonToSubscription.SubscriberName))
-                            //{
-                            //    var a = _packetFrames![jsonToSubscription.TopicName!];
-                            //    Console.WriteLine($"Subscriber {jsonToSubscription.SubscriberName} already exists for topic {jsonToSubscription.TopicName!}. Sending existing messages.");
-
-                            //    foreach (var msg in a)
-                            //    {
-                            //        var jsonData = JsonSerializer.Serialize(msg);
-                            //        byte[] msgToSend = Encoding.UTF8.GetBytes(jsonData);
-                            //        try
-                            //        {
-                            //            await client.socket!.SendAsync(msgToSend, SocketFlags.None);
-                            //            Console.WriteLine($"Message sent to existing subscriber on topic {jsonToSubscription.TopicName!}");
-                            //        }
-                            //        catch (Exception ex)
-                            //        {
-                            //            Console.WriteLine($"Failed to send to existing subscriber, removing... {ex.Message}");
-                            //            client.isConnected = false;
-                            //        }
-                            //    }
-                            //}
-                            //client.TopicName = jsonToSubscription.TopicName;
-                            //break;
                         }
                         else
                         {
